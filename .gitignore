@@ -15,3 +15,6 @@ buildNumber.properties
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+.idea/
+src/main/resources/result.csv
+src/main/resources/tasks.csv

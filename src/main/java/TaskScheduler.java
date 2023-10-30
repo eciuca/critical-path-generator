@@ -18,8 +18,7 @@ public class TaskScheduler {
     public static final int COLUMN_MAX_DURATION = 4;
     public static final String SEPARATOR = ",";
 
-    public static void main(String[] args) throws FileNotFoundException {
-        Set<String> alreadyProcessed = new HashSet<>();
+    public static void main(String[] args) {
         LocalDate startDate = LocalDate.of(2023, 10, 30);
 
         Map<String, Task> taskMap = new HashMap<>();
@@ -35,7 +34,7 @@ public class TaskScheduler {
             String[] nextLine;
 
             String[] header = reader.readNext();
-            fileWriter.write(String.join(SEPARATOR, header) + ";start-date;end-date\n");
+            fileWriter.write(String.join(SEPARATOR, header) + "#SEP#start-date#SEP#end-date\n".replaceAll("#SEP#", SEPARATOR));
 
             // Read tasks from CSV and create Task objects
             while ((nextLine = reader.readNext()) != null) {
@@ -131,155 +130,4 @@ public class TaskScheduler {
         }
     }
 
-    private static long manDaysToHours(double duration) {
-        return Math.round(24 * duration);
-    }
-
-    static final class Task {
-        private final String id;
-        private final String dependencies;
-        private final double duration;
-        private final double minDuration;
-        private final double maxDuration;
-        private LocalDateTime start;
-        private LocalDateTime end;
-        private LocalDateTime minStart;
-        private LocalDateTime minEnd;
-        private LocalDateTime maxStart;
-        private LocalDateTime maxEnd;
-
-        Task(String id, String dependencies, double duration) {
-            this(id, dependencies, duration, -1, -1);
-        }
-
-        Task(String id, String dependencies, double duration, double minDuration, double maxDuration) {
-            this.id = id;
-            this.dependencies = dependencies;
-            this.duration = duration;
-            this.minDuration = minDuration;
-            this.maxDuration = maxDuration;
-        }
-
-        public String id() {
-            return id;
-        }
-
-        public boolean hasDependencies() {
-            return dependencies != null && !dependencies.trim().isEmpty();
-        }
-
-        public String dependencies() {
-            return dependencies;
-        }
-
-        public double duration() {
-            return duration;
-        }
-
-        public String getId() {
-            return id;
-        }
-
-        public String[] getDependencies() {
-            return Arrays.stream(dependencies.split(",")).map(String::trim).toArray(String[]::new);
-        }
-
-        public double getDuration() {
-            return duration;
-        }
-
-        public double getMinDuration() {
-            return minDuration;
-        }
-
-        public double getMaxDuration() {
-            return maxDuration;
-        }
-
-        public LocalDateTime getStart() {
-            return start;
-        }
-
-        public void setStart(LocalDateTime start) {
-            this.start = start;
-        }
-
-        public void setStartAndEndDate(LocalDateTime start) {
-            this.start = start;
-            long hours = manDaysToHours(duration);
-            this.end = start.plusHours(hours);
-        }
-
-        public void setMinStartAndEndDate(LocalDateTime start) {
-            this.minStart = start;
-            long hours = manDaysToHours(minDuration);
-            this.minEnd = start.plusHours(hours);
-        }
-
-        public void setMaxStartAndEndDate(LocalDateTime start) {
-            this.maxStart = start;
-            long hours = manDaysToHours(maxDuration);
-            this.maxEnd = start.plusHours(hours);
-        }
-
-        public LocalDateTime getMinStart() {
-            return minStart;
-        }
-
-        public LocalDateTime getMinEnd() {
-            return minEnd;
-        }
-
-        public LocalDateTime getMaxStart() {
-            return maxStart;
-        }
-
-        public LocalDateTime getMaxEnd() {
-            return maxEnd;
-        }
-
-        public LocalDateTime getEnd() {
-            return end;
-        }
-
-        public void setEnd(LocalDateTime end) {
-            this.end = end;
-        }
-
-        public String toCSVLine() {
-            String csvLineNoMinMax = "\"%s\"#SEP#\"%s\"#SEP#\"%s\"#SEP#\"%s\"#SEP#\"%s\""
-                    .formatted(id, dependencies, duration, formatDate(start), formatDate(end));
-
-            if (minDuration > -1) {
-                csvLineNoMinMax += "#SEP#\"%s\"#SEP#\"%s\"".formatted(formatDate(maxStart), formatDate(maxEnd));
-            }
-            if (maxDuration > -1) {
-                csvLineNoMinMax += "#SEP#\"%s\"#SEP#\"%s\"".formatted(formatDate(minStart), formatDate(minEnd));
-            }
-
-            return csvLineNoMinMax
-                    .replaceAll("#SEP#", SEPARATOR);
-        }
-
-        private String formatDate(LocalDateTime start) {
-            return start.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        }
-
-        @Override
-        public String toString() {
-            return "Task{" +
-                    "id='" + id + '\'' +
-                    ", dependencies='" + dependencies + '\'' +
-                    ", duration=" + duration +
-                    ", minDuration=" + minDuration +
-                    ", maxDuration=" + maxDuration +
-                    ", start=" + start +
-                    ", end=" + end +
-                    ", minStart=" + minStart +
-                    ", minEnd=" + minEnd +
-                    ", maxStart=" + maxStart +
-                    ", maxEnd=" + maxEnd +
-                    '}';
-        }
-    }
 }
