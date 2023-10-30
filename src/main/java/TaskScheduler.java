@@ -1,7 +1,7 @@
 import au.com.bytecode.opencsv.CSVReader;
 
-import java.io.IOException;
-import java.io.StringReader;
+import java.io.*;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -16,46 +16,26 @@ public class TaskScheduler {
     public static final int COLUMN_DURATION = 2;
     public static final int COLUMN_MIN_DURATION = 3;
     public static final int COLUMN_MAX_DURATION = 4;
+    public static final String SEPARATOR = ",";
 
-    public static void main(String[] args) {
-        String input = """
-                Task,Dependencies,Duration
-                1,,0
-                2,1,10.00
-                3,2,25.00
-                4,1,0.50
-                5,4,0.50
-                6,4,90.00
-                7,"3, 4, 5",15.00
-                8,"5, 7",10.00
-                9,"5, 6",20.00
-                10,5,25.00
-                11,1,10.00
-                12,"3, 7",22.00
-                13,"3, 12",35.00
-                14,1,3.00
-                15,"1, 6, 11, 12 , 13",9.25
-                16,"1, 11",4.00
-                17,1,4.50
-                18,"1, 6, 11, 12, 13",12.00
-                19,1,30.00
-                20,"1, 11, 12, 13, 19",5.00
-                21,1,10.00
-                22,"1, 12",16.00
-                23,12,40.00
-                24,"all",0           
-                    """;
-        LocalDate startDate = LocalDate.of(2023,7,19);
-//        String csvFile = "tasks.csv"; // Replace with the path to your CSV file
+    public static void main(String[] args) throws FileNotFoundException {
+        Set<String> alreadyProcessed = new HashSet<>();
+        LocalDate startDate = LocalDate.of(2023, 10, 30);
 
         Map<String, Task> taskMap = new HashMap<>();
 
-        try (CSVReader reader = new CSVReader(new StringReader(input))) {
-//        try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
+        File inputFile = Paths.get("src/main/resources/tasks.csv").toFile();
+        File outputFile = Paths.get("src/main/resources/result.csv").toFile();
+
+        try (Reader inputReader = new FileReader(inputFile);
+             CSVReader reader = new CSVReader(inputReader, SEPARATOR.charAt(0));
+             FileWriter fileWriter = new FileWriter(outputFile)) {
+
+
             String[] nextLine;
 
-            // Skip the header line
-            reader.readNext();
+            String[] header = reader.readNext();
+            fileWriter.write(String.join(SEPARATOR, header) + ";start-date;end-date\n");
 
             // Read tasks from CSV and create Task objects
             while ((nextLine = reader.readNext()) != null) {
@@ -91,9 +71,16 @@ public class TaskScheduler {
                 tasksWithDependencies = taskMap.values().stream()
                         .filter(Task::hasDependencies)
                         .filter(task -> task.getStart() == null)
+                        .sorted(Comparator.comparing(Task::getId))
                         .toList();
 
                 tasksWithDependencies.forEach(task -> {
+//                    if (alreadyProcessed.contains(task.getId())) {
+//                        throw new RuntimeException("Circular dependency for task: " + task.getId());
+//                    } else {
+//                        alreadyProcessed.add(task.getId());
+//                    }
+                    System.out.println("Handle dependencies for task " + task.getId());
                     String[] dependencies = task.getDependencies().length == 1 && task.getDependencies()[0].equals("all")
                             ? taskMap.keySet().stream().filter(taskId -> !taskId.equals(task.getId())).toArray(String[]::new)
                             : task.getDependencies();
@@ -121,6 +108,9 @@ public class TaskScheduler {
                             task.setMinStartAndEndDate(maxMinFinishDateOfDependencies);
                         }
                     }
+                    else {
+                        System.out.println("Not all dependencies are computed for task: " + task.getId());
+                    }
                 });
             } while (!tasksWithDependencies.isEmpty());
 
@@ -128,7 +118,13 @@ public class TaskScheduler {
             taskMap.values().stream()
                     .sorted(Comparator.comparing(task -> Integer.parseInt(task.id()), Comparator.naturalOrder()))
                     .map(Task::toCSVLine)
-                    .forEach(System.out::println);
+                    .forEach(csvLine -> {
+                        try {
+                            fileWriter.write(csvLine + "\n");
+                        } catch (IOException e) {
+                            System.out.println("Failed to write line: " + csvLine);
+                        }
+                    });
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -155,6 +151,7 @@ public class TaskScheduler {
         Task(String id, String dependencies, double duration) {
             this(id, dependencies, duration, -1, -1);
         }
+
         Task(String id, String dependencies, double duration, double minDuration, double maxDuration) {
             this.id = id;
             this.dependencies = dependencies;
@@ -250,17 +247,18 @@ public class TaskScheduler {
         }
 
         public String toCSVLine() {
-            String csvLineNoMinMax = "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\""
+            String csvLineNoMinMax = "\"%s\"#SEP#\"%s\"#SEP#\"%s\"#SEP#\"%s\"#SEP#\"%s\""
                     .formatted(id, dependencies, duration, formatDate(start), formatDate(end));
 
             if (minDuration > -1) {
-                csvLineNoMinMax += ",\"%s\",\"%s\"".formatted( formatDate(maxStart), formatDate(maxEnd));
+                csvLineNoMinMax += "#SEP#\"%s\"#SEP#\"%s\"".formatted(formatDate(maxStart), formatDate(maxEnd));
             }
             if (maxDuration > -1) {
-                csvLineNoMinMax += ",\"%s\",\"%s\"".formatted( formatDate(minStart), formatDate(minEnd));
+                csvLineNoMinMax += "#SEP#\"%s\"#SEP#\"%s\"".formatted(formatDate(minStart), formatDate(minEnd));
             }
 
-            return csvLineNoMinMax;
+            return csvLineNoMinMax
+                    .replaceAll("#SEP#", SEPARATOR);
         }
 
         private String formatDate(LocalDateTime start) {
