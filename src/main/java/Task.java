@@ -1,9 +1,15 @@
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Comparator;
 
-public class Task {
+@Data
+@RequiredArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+public class Task implements Comparable<Task> {
 
     private final String id;
     private final String dependencies;
@@ -17,60 +23,19 @@ public class Task {
     private LocalDateTime maxStart;
     private LocalDateTime maxEnd;
 
-    Task(String id, String dependencies, double duration) {
-        this(id, dependencies, duration, -1, -1);
+    public static Task of(String id, String dependencies, double duration) {
+        return new Task(id, dependencies, duration, -1, -1);
     }
-
-    Task(String id, String dependencies, double duration, double minDuration, double maxDuration) {
-        this.id = id;
-        this.dependencies = dependencies;
-        this.duration = duration;
-        this.minDuration = minDuration;
-        this.maxDuration = maxDuration;
-    }
-
-    public String id() {
-        return id;
+    public static Task of(String id, String dependencies, double duration, double minDuration, double maxDuration) {
+        return new Task(id, dependencies, duration, minDuration, maxDuration);
     }
 
     public boolean hasDependencies() {
         return dependencies != null && !dependencies.trim().isEmpty();
     }
 
-    public String dependencies() {
-        return dependencies;
-    }
-
-    public double duration() {
-        return duration;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public String[] getDependencies() {
+    public String[] getDependenciesAsArray() {
         return Arrays.stream(dependencies.split(",")).map(String::trim).toArray(String[]::new);
-    }
-
-    public double getDuration() {
-        return duration;
-    }
-
-    public double getMinDuration() {
-        return minDuration;
-    }
-
-    public double getMaxDuration() {
-        return maxDuration;
-    }
-
-    public LocalDateTime getStart() {
-        return start;
-    }
-
-    public void setStart(LocalDateTime start) {
-        this.start = start;
     }
 
     public void setStartAndEndDate(LocalDateTime start) {
@@ -101,30 +66,6 @@ public class Task {
     public void setMaxStartAndEndDate(LocalDateTime start) {
         this.maxStart = start;
         this.maxEnd = computeEnd(start);
-    }
-
-    public LocalDateTime getMinStart() {
-        return minStart;
-    }
-
-    public LocalDateTime getMinEnd() {
-        return minEnd;
-    }
-
-    public LocalDateTime getMaxStart() {
-        return maxStart;
-    }
-
-    public LocalDateTime getMaxEnd() {
-        return maxEnd;
-    }
-
-    public LocalDateTime getEnd() {
-        return end;
-    }
-
-    public void setEnd(LocalDateTime end) {
-        this.end = end;
     }
 
     public String toCSVLine() {
@@ -165,5 +106,11 @@ public class Task {
 
     private static long manDaysToHours(double duration) {
         return Math.round(24 * duration);
+    }
+
+    @Override
+    public int compareTo(Task o) {
+        return Comparator.comparing((Task task) -> Integer.parseInt(task.getId()), Comparator.naturalOrder())
+                .compare(this, o);
     }
 }

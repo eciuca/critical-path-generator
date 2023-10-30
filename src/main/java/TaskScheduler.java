@@ -1,4 +1,5 @@
 import au.com.bytecode.opencsv.CSVReader;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
 import java.nio.file.Paths;
@@ -8,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Predicate;
 
+@Slf4j
 public class TaskScheduler {
 
     public static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_DATE;
@@ -30,16 +32,14 @@ public class TaskScheduler {
              CSVReader reader = new CSVReader(inputReader, SEPARATOR.charAt(0));
              FileWriter fileWriter = new FileWriter(outputFile)) {
 
-
             String[] nextLine;
 
-            String[] header = reader.readNext();
-            fileWriter.write(String.join(SEPARATOR, header) + "#SEP#start-date#SEP#end-date\n".replaceAll("#SEP#", SEPARATOR));
+            writeHeader(reader, fileWriter);
 
             // Read tasks from CSV and create Task objects
             while ((nextLine = reader.readNext()) != null) {
                 String taskId = nextLine[COLUMN_TASK_ID].trim();
-                System.out.println("Reading task " + taskId);
+                log.info("Reading task " + taskId);
                 String dependencies = nextLine[COLUMN_DEPENDENCIES];
                 double duration = Double.parseDouble(nextLine[COLUMN_DURATION].trim());
 
@@ -47,10 +47,10 @@ public class TaskScheduler {
                     double minDuration = Double.parseDouble(nextLine[COLUMN_MIN_DURATION].trim());
                     double maxDuration = Double.parseDouble(nextLine[COLUMN_MAX_DURATION].trim());
 
-                    Task task = new Task(taskId, dependencies, duration, minDuration, maxDuration);
+                    Task task = Task.of(taskId, dependencies, duration, minDuration, maxDuration);
                     taskMap.put(taskId, task);
                 } else {
-                    Task task = new Task(taskId, dependencies, duration);
+                    Task task = Task.of(taskId, dependencies, duration);
                     taskMap.put(taskId, task);
                 }
             }
@@ -79,10 +79,10 @@ public class TaskScheduler {
 //                    } else {
 //                        alreadyProcessed.add(task.getId());
 //                    }
-                    System.out.println("Handle dependencies for task " + task.getId());
-                    String[] dependencies = task.getDependencies().length == 1 && task.getDependencies()[0].equals("all")
+                    log.info("Handle dependencies for task " + task.getId());
+                    String[] dependencies = task.getDependenciesAsArray().length == 1 && task.getDependenciesAsArray()[0].equals("all")
                             ? taskMap.keySet().stream().filter(taskId -> !taskId.equals(task.getId())).toArray(String[]::new)
-                            : task.getDependencies();
+                            : task.getDependenciesAsArray();
                     boolean allDependenciesAreComputed = Arrays.stream(dependencies).allMatch(taskId -> taskMap.containsKey(taskId) && taskMap.get(taskId).getEnd() != null);
                     if (allDependenciesAreComputed) {
                         LocalDateTime maxFinishDateOfDependencies = Arrays.stream(dependencies)
@@ -108,26 +108,31 @@ public class TaskScheduler {
                         }
                     }
                     else {
-                        System.out.println("Not all dependencies are computed for task: " + task.getId());
+                        log.info("Not all dependencies are computed for task: " + task.getId());
                     }
                 });
             } while (!tasksWithDependencies.isEmpty());
 
             // Output the results
             taskMap.values().stream()
-                    .sorted(Comparator.comparing(task -> Integer.parseInt(task.id()), Comparator.naturalOrder()))
+                    .sorted()
                     .map(Task::toCSVLine)
                     .forEach(csvLine -> {
                         try {
                             fileWriter.write(csvLine + "\n");
                         } catch (IOException e) {
-                            System.out.println("Failed to write line: " + csvLine);
+                            log.error("Failed to write line: " + csvLine, e);
                         }
                     });
 
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Failed to read input file", e);
         }
+    }
+
+    private static void writeHeader(CSVReader reader, FileWriter fileWriter) throws IOException {
+        String[] header = reader.readNext();
+        fileWriter.write(String.join(SEPARATOR, header) + "#SEP#start-date#SEP#end-date\n".replaceAll("#SEP#", SEPARATOR));
     }
 
 }
